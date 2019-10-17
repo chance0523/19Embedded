@@ -22,7 +22,7 @@ static int peek_character = -1;
 void init_keyboard()
 {
     tcgetattr(0, &initial_settings);
-    new settings = initial_settings;
+    new_settings = initial_settings;
     new_setings.c_lflag &= ~ICANON;
     new_setings.c_lflag &= ~ECHO;
     new_setings.c_lflag &= ~ISIG;
