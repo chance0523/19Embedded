@@ -67,3 +67,72 @@ int readch()
     read(0, &ch, 1);
     return ch;
 }
+
+int main()
+{
+    int fd;
+    unsigned short *addr_fpga, *addr_led;
+    unsigned short dir = '0';
+    unsigned short val, val2;
+    char ch = 'l';
+    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0)
+    {
+        perror("mem open fail n");
+        exit(1);
+    }
+    addr_fpga = (unsigned short *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, FPGA_BASEADDRESS);
+    addr_led = addr_fpga + LED_OFFSET / sizeof(unsigned short);
+    if (*addr_led == (unsigned short)-1)
+    {
+        close(fd);
+        printf("mmap error n");
+        exit(1);
+    }
+    init_keyboard();
+    printf(" -------------------------------------- n");
+    printf(" 8bit LED IO Interface Procedure n");
+    printf(" -------------------------------------- n");
+    printf(" [l] left shift n");
+    printf(" [r] right shift n");
+    printf(" [q] exit n");
+    printf(" -------------------------------------- n n");
+    *addr_led = 0x100;
+    val = 0;
+    val2 = 0;
+    while (dir != 'q')
+    {
+        if (dir == 'l')
+        {
+            val2 = (~(val >> 5)) & 0x1;
+            val = (val << 1) | val2;
+        }
+        else if (dir == 'r')
+        {
+            val2 = (~(val << 5)) & 0x80;
+            val = (val >> 1) | val2;
+        }
+        *addr_led = val | 0x100;
+        usleep(80000);
+        if (kbhit())
+        {
+            ch = readch();
+            switch (ch)
+            {
+            case 'r':
+                dir = 'r';
+                break;
+            case 'l':
+                dir = 'l';
+                break;
+            case 'q':
+                dir = 'q';
+                break;
+            }
+        }
+    }
+    *addr_led = 0x00;
+    close_keyboard();
+    munmap(addr_fpga, 4096);
+    close(fd);
+    return 0;
+}
