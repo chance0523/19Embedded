@@ -16,18 +16,18 @@
 #define FPGA_BASEADDRESS 0x88000000
 #define LED_OFFSET 0x20
 
-static struct termios initial_settings, new_setings;
+static struct termios initial_settings, new_settings;
 static int peek_character = -1;
 
 void init_keyboard()
 {
     tcgetattr(0, &initial_settings);
     new_settings = initial_settings;
-    new_setings.c_lflag &= ~ICANON;
-    new_setings.c_lflag &= ~ECHO;
-    new_setings.c_lflag &= ~ISIG;
-    new_setings.c_cc[VMIN] = 1;
-    new_setings.c_cc[VTIME] = 0;
+    new_settings.c_lflag &= ~ICANON;
+    new_settings.c_lflag &= ~ECHO;
+    new_settings.c_lflag &= ~ISIG;
+    new_settings.c_cc[VMIN] = 1;
+    new_settings.c_cc[VTIME] = 0;
     tcsetattr(0, TCSANOW, &new_setings);
 }
 
@@ -41,7 +41,7 @@ int kbhit()
     char ch;
     int nread;
     if (peek_character != -1)
-        return -1;
+        return 1;
     new_setings.c_cc[VMIN] = 0;
     tcsetattr(0, TCSANOW, &new_setings);
     nread = read(0, &ch, 1);
