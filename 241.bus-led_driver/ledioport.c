@@ -9,11 +9,11 @@
 
 #define DRIVER_AUTHOR "hanback"
 #define DRIVER_DESC "led test program"
-#define LEDIOPORT_MAJOR 241
-#define LEDIOPORT_NAME "LED IO PORT"
+#define LEDIOPORT_MAJOR 241			 // 디바이스 주 번호
+#define LEDIOPORT_NAME "LED IO PORT" // 디바이스 이름
 #define LEDIOPORT_MODULE_VERSION
-#define LEDIOPORT_ADDRESS 0x88000020
-#define LEDIOPORT_ADDRESS_RANGE 0x1000
+#define LEDIOPORT_ADDRESS 0x88000020   // LED의 물리 주소
+#define LEDIOPORT_ADDRESS_RANGE 0x1000 // I/O 영역의 크기
 
 //Global variable
 static int ledioport_usage = 0;			 //드라이버가 사용여부를 확인하는 값
@@ -22,36 +22,27 @@ static unsigned long *ledioport_ioremap; //IO주소공간저장
 int ledioport_open(struct inode *minode, struct file *mfile)
 {
 	// 디바이스가 열려 있는지 확인.
-
 	if (ledioport_usage != 0)
 		return -EBUSY;
-
 	// LED의 가상 주소 매핑
 	ledioport_ioremap = ioremap(LEDIOPORT_ADDRESS, LEDIOPORT_ADDRESS_RANGE);
 	// 등록할 수 있는 I/O 영역인지 확인값
-
 	if (!check_mem_region((unsigned long)ledioport_ioremap, LEDIOPORT_ADDRESS_RANGE))
-	{
-		// I/O 메모리 영역을 등록
+	{ // I/O 메모리 영역을 등록
 		request_mem_region((unsigned long)ledioport_ioremap, LEDIOPORT_ADDRESS_RANGE, LEDIOPORT_NAME);
 	}
-
 	else
 		printk(KERN_WARNING "Can't get IO Region 0x%x\n", (unsigned int)ledioport_ioremap);
-
 	ledioport_usage = 1;
-
 	return 0;
 }
 
 // 응용 프로그램에서 디바이스를 더이상 사용하지 않아서 닫기를 구현하는 함수
 int ledioport_release(struct inode *minode, struct file *mfile)
 { // 매핑된 가상주소를 해제
-
 	iounmap(ledioport_ioremap);
 	// 등록된 I/O 메모리 영역을 해제
 	release_mem_region((unsigned long)ledioport_ioremap, LEDIOPORT_ADDRESS_RANGE);
-
 	ledioport_usage = 0;
 	return 0;
 }
@@ -75,12 +66,10 @@ ssize_t ledioport_write_byte(struct file *inode, const char *gdata, size_t lengt
 // write 와 release 도 마찬가지로 동작한다. 만약 등록되지 않은 동작에 대해서는 커널에서
 // 정의해 놓은 default 동작을 하도록 되어 있다.
 static struct file_operations led_fops = {
-
 	.owner = THIS_MODULE,
 	.open = ledioport_open,
 	.write = ledioport_write_byte,
 	.release = ledioport_release,
-
 };
 
 // 모듈을 커널 내부로 삽입
