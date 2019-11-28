@@ -89,13 +89,13 @@ int main()
         exit(1);
     }
     init_keyboard();
-    printf(" -------------------------------------- n");
-    printf(" 8bit LED IO Interface Procedure n");
-    printf(" -------------------------------------- n");
-    printf(" [l] left shift n");
-    printf(" [r] right shift n");
-    printf(" [q] exit n");
-    printf(" -------------------------------------- n n");
+    printf(" -------------------------------------- \n");
+    printf(" 8bit LED IO Interface Procedure \n");
+    printf(" -------------------------------------- \n");
+    printf(" [l] left shift \n");
+    printf(" [r] right shift \n");
+    printf(" [q] exit \n");
+    printf(" --------------------------------------\n\n");
     *addr_led = 0x100;
     val = 0;
     val2 = 0;
