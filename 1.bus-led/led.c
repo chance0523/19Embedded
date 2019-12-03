@@ -77,7 +77,7 @@ int main()
     char ch = 'l';
     if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0)
     {
-        perror("mem open fail n");
+        perror("mem open fail\n");
         exit(1);
     }
     addr_fpga = (unsigned short *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, FPGA_BASEADDRESS);
@@ -85,7 +85,7 @@ int main()
     if (*addr_led == (unsigned short)-1)
     {
         close(fd);
-        printf("mmap error n");
+        printf("mmap error\n");
         exit(1);
     }
     init_keyboard();
