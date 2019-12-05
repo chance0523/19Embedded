@@ -20,7 +20,7 @@
 #define RGB565(r, g, b) ((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3))
 #define FBDEV_FILE "/dev/fb0"
 #define CAMERA_DEVICE "/dev/camera"
-#define FILE_NAME "image.jpg"
+#define FILE_NAME "save.jpg"
 
 static CvMemStorage *storage = 0;
 struct fb_var_screeninfo fbvar;
@@ -152,10 +152,13 @@ int main(int argc, char **argv)
 {
     int fbfd, fd;
     int dev, ret = 0;
+    int x, y;
     int optlen = strlen("--cascade=");
     unsigned short ch = 0;
     CvCapture *capture = 0;
     IplImage *image = NULL;
+    IplImage *resizeImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    IplImage *hsvImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
 
     if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0)
     {
@@ -193,19 +196,46 @@ int main(int argc, char **argv)
     Fill_Background(0x0011);
 
     //keep 변환 가능
-    image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+
+    //cvResize(image, target, CV_INTER_LINEAR);
 
     //printf infromation
 
     init_keyboard();
 
-    ////////////////////////////
-
-    //////    c o d e     //////
-
-    ///////////////////////////
-
+    image = cvLoadImage("origin.jpg", 1);
+    cvResize(image, resizeImg, 1);
     cvReleaseImage(&image);
+    cvIMG2RGB565(resizeImg, cis_rgb, 320, 240);
+    fb_display(cis_rgb, 40, 120);
+    cvCvtImage(resizeImg, resizeImg, CV_BGR2HSV);
+
+    for (y = 0; y < 240; y++)
+        for (x = 0; x < 320; x++)
+        {
+            //frame<at>.(y,x)[0]
+            // r e d
+            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] < 15 || resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] > 165)
+            {
+                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > 200)
+                    if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > 200)
+                    {
+                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
+                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 1] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
+                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 2] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
+                    }
+            }
+            else
+            {
+                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3] = 30;
+                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 1] = 30;
+                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 2] = 30;
+            }
+        }
+    cvIMG2RGB565(hsvImage, cis_rgb, 320, 240);
+    fb_display(cis_rgb, 435, 120);
+
+    cvReleaseImage(&resizeImg);
     close_keyboard();
     return 0;
 }
