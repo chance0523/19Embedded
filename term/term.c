@@ -22,6 +22,11 @@
 #define CAMERA_DEVICE "/dev/camera"
 #define FILE_NAME "save.jpg"
 
+#define H_UPPER_RED 15
+#define H_LOWER_RED 165
+#define SAT 150
+#define VAL 200
+
 static CvMemStorage *storage = 0;
 struct fb_var_screeninfo fbvar;
 unsigned char *pfbmap;
@@ -156,7 +161,8 @@ int main(int argc, char **argv)
     int optlen = strlen("--cascade=");
     unsigned short ch = 0;
     CvCapture *capture = 0;
-    IplImage *image = NULL;
+    //IplImage *image = NULL;
+    IplImage *image = cvLoadImage("origin.jpg", 1);
     IplImage *resizeImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
     IplImage *hsvImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
 
@@ -203,7 +209,7 @@ int main(int argc, char **argv)
 
     init_keyboard();
 
-    image = cvLoadImage("origin.jpg", 1);
+    //image = cvLoadImage("origin.jpg", 1);
     cvResize(image, resizeImg, 1);
     cvReleaseImage(&image);
     cvIMG2RGB565(resizeImg, cis_rgb, 320, 240);
@@ -211,14 +217,15 @@ int main(int argc, char **argv)
     cvCvtImage(resizeImg, resizeImg, CV_BGR2HSV);
 
     for (y = 0; y < 240; y++)
+    {
         for (x = 0; x < 320; x++)
         {
-            //frame<at>.(y,x)[0]
+            // frame<at>.(y,x)[0]
             // r e d
-            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] < 15 || resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] > 165)
+            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] < H_UPPER_RED || resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] > H_LOWER_RED)
             {
-                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > 200)
-                    if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > 200)
+                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > SAT)
+                    if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > VAL)
                     {
                         hsvImage->imageData[(y * resizeImg->widthStep) + x * 3] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
                         hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 1] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
@@ -232,10 +239,17 @@ int main(int argc, char **argv)
                 hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 2] = 30;
             }
         }
-    cvIMG2RGB565(hsvImage, cis_rgb, 320, 240);
+    }
+
+    IplImage *image_display = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    //image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    cvCvtColor(hsvImage, image, CV_HSV2BGR);
+    cvIMG2RGB565(image, cis_rgb, 320, 240);
     fb_display(cis_rgb, 435, 120);
 
+    cvReleaseImage(&image_display);
     cvReleaseImage(&resizeImg);
+    cvReleaseImage(&hsvImage);
     close_keyboard();
     return 0;
 }
