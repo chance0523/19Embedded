@@ -22,11 +22,36 @@
 #define CAMERA_DEVICE "/dev/camera"
 #define FILE_NAME "save.jpg"
 
-#define H_UPPER_RED 15
-#define H_LOWER_RED 165
-#define SAT 150
-#define VAL 200
+#define H_RED_ORANGE 13
+#define H_ORANGE_YELLOW 27
+#define H_YELLOW_GREEN 40
+#define H_GREEN_CYAN 80
+#define H_CYAN_BLUE 100
+#define H_BLUE_VIOLET 130
+#define H_VIOLET_RED 165
+#define S_LIMIT 150
+#define V_LIMIT 150
 
+unsigned char color_table[181] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,           //  0 -  9
+    1, 1, 1, 1, 2, 2, 2, 2, 2, 2,           // 10 - 19
+    2, 2, 2, 2, 2, 2, 2, 2, 4, 4,           // 20 - 29
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4,           // 30 - 39
+    4, 8, 8, 8, 8, 8, 8, 8, 8, 8,           // 40 - 49
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8,           // 50 - 59
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8,           // 60 - 69
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8,           // 70 - 79
+    16, 16, 16, 16, 16, 16, 16, 16, 16, 16, // 80 - 89
+    16, 16, 16, 16, 16, 16, 16, 16, 16, 16, // 90 - 99
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, // 100 - 109
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, // 110 - 119
+    32, 32, 32, 32, 32, 32, 32, 32, 32, 32, // 120 - 129
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, // 130 - 139
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, // 140 - 149
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, // 150 - 159
+    64, 64, 64, 64, 64, 1, 1, 1, 1, 1,      // 160 - 169
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,           // 170 - 179
+    1};
 static CvMemStorage *storage = 0;
 struct fb_var_screeninfo fbvar;
 unsigned char *pfbmap;
@@ -99,7 +124,8 @@ int fb_display(unsigned short *rgb, int sx, int sy)
 
     for (coor_y = 0; coor_y < 240; coor_y++)
     {
-        ptr = (unsigned short *)pfbmap + (screen_width * sy + sx) + (screen_width * coor_y);
+        ptr = (unsigned short *)pfbmap + (screen_width * sy + sx) +
+              (screen_width * coor_y);
         for (coor_x = 0; coor_x < 320; coor_x++)
         {
             *ptr++ = rgb[coor_x + coor_y * 320];
@@ -146,9 +172,19 @@ void RGB2cvIMG(IplImage *img, unsigned short *rgb, int ex, int ey)
     {
         for (x = 0; x < ex; x++)
         {
-            (img->imageData[(y * img->widthStep) + x * 3]) = (rgb[y * ex + x] & 0x1F) << 3;               //b
-            (img->imageData[(y * img->widthStep) + x * 3 + 1]) = ((rgb[y * ex + x] & 0x07E0) >> 5) << 2;  //g
-            (img->imageData[(y * img->widthStep) + x * 3 + 2]) = ((rgb[y * ex + x] & 0xF800) >> 11) << 3; //r
+            (img->imageData[(y * img->widthStep) + x * 3]) = (rgb[y * ex + x] &
+                                                              0x1F)
+                                                             << 3; //b
+            (img->imageData[(y * img->widthStep) + x * 3 + 1]) = ((rgb[y * ex +
+                                                                       x] &
+                                                                   0x07E0) >>
+                                                                  5)
+                                                                 << 2; //g
+            (img->imageData[(y * img->widthStep) + x * 3 + 2]) = ((rgb[y * ex +
+                                                                       x] &
+                                                                   0xF800) >>
+                                                                  11)
+                                                                 << 3; //r
         }
     }
 }
@@ -158,14 +194,16 @@ int main(int argc, char **argv)
     int fbfd, fd;
     int dev, ret = 0;
     int x, y;
+    int count = 0;
     int optlen = strlen("--cascade=");
     unsigned short ch = 0;
+    unsigned short dipSwitchNew, dipSwitchOrig;
+    char fileName[30];
     CvCapture *capture = 0;
-    //IplImage *image = NULL;
-    IplImage *image = cvLoadImage("origin.jpg", 1);
-    IplImage *resizeImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
-    IplImage *hsvImage = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
-
+    IplImage *image = NULL;
+    IplImage *resizeImg;
+    IplImage *hsvImg;
+    IplImage *maskImg;
     if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) < 0)
     {
         perror("mem open fail\n");
@@ -190,12 +228,19 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+    pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2,
+                                   PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 
     if ((unsigned)pfbmap < 0)
     {
         perror("mmap failed...");
         exit(1);
+    }
+
+    if ((dev = open("/dev/dipsw", O_RDONLY)) < 0)
+    {
+        perror("DIPSW open fail\n");
+        return -1;
     }
 
     storage = cvCreateMemStorage(0);
@@ -207,49 +252,102 @@ int main(int argc, char **argv)
 
     //printf infromation
 
+    // Initializing
     init_keyboard();
+    printf("Input the file name\n");
+    scanf("%s", fileName);
+    /*while(count < 30 && ch != '\n')
+         {
+                 if(kbhit())
+                 {
+                         ch = readch();
+                         fileName[count] = ch;
+                         count++;
+                 }
+         }
+         fileName[count - 1] = '\0';*/
 
-    //image = cvLoadImage("origin.jpg", 1);
-    cvResize(image, resizeImg, 1);
+    image = cvLoadImage(fileName, 1);
+    if (image == NULL)
+    {
+        printf("shut down\n");
+        close_keyboard();
+        return 0;
+    }
+
+    // Image matrixes define
+    resizeImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    hsvImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    maskImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 1);
+
+    // Image resizing
+    cvResize(image, resizeImg, CV_INTER_LINEAR);
     cvReleaseImage(&image);
+
+    // Image display
     cvIMG2RGB565(resizeImg, cis_rgb, 320, 240);
     fb_display(cis_rgb, 40, 120);
-    cvCvtImage(resizeImg, resizeImg, CV_BGR2HSV);
 
+    // Image change RGB to HSV
+    cvCvtColor(resizeImg, resizeImg, CV_BGR2HSV);
+
+    // Make a mask Image (color table)
     for (y = 0; y < 240; y++)
-    {
         for (x = 0; x < 320; x++)
         {
-            // frame<at>.(y,x)[0]
-            // r e d
-            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] < H_UPPER_RED || resizeImg->imageData[(y * resizeImg->widthStep) + x * 3] > H_LOWER_RED)
+            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > S_LIMIT)
             {
-                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > SAT)
-                    if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > VAL)
-                    {
-                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
-                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 1] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
-                        hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 2] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
-                    }
+                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > V_LIMIT)
+                    maskImg->imageData[(y * maskImg->widthStep) + x] =
+                        color_table[resizeImg->imageData[(y * resizeImg->widthStep) + x * 3]];
+                else
+                    maskImg->imageData[(y * maskImg->widthStep) + x] = 0;
             }
             else
-            {
-                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3] = 30;
-                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 1] = 30;
-                hsvImage->imageData[(y * resizeImg->widthStep) + x * 3 + 2] = 30;
-            }
+                maskImg->imageData[(y * maskImg->widthStep) + x] = 0;
+        }
+
+    // Main operation
+    read(dev, &dipSwitchOrig, 2);
+    ch = 0;
+    image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    while (ch != 'q')
+    {
+        if (kbhit())
+            ch = readch();
+        read(dev, &dipSwitchNew, 2);
+        if (dipSwitchOrig != dipSwitchNew)
+        {
+            dipSwitchOrig = dipSwitchNew;
+            for (y = 0; y < 240; y++)
+                for (x = 0; x < 320; x++)
+                {
+                    if (dipSwitchOrig & maskImg->imageData[y * maskImg->widthStep + x])
+                    {
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] =
+                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] =
+                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] =
+                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
+                    }
+                    else
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] =
+                            hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] =
+                                hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = 0;
+                }
+            cvCvtColor(hsvImg, image, CV_HSV2BGR);
+            cvIMG2RGB565(image, cis_rgb, 320, 240);
+            fb_display(cis_rgb, 435, 120);
+            printf("%02X\n", dipSwitchOrig);
         }
     }
 
-    IplImage *image_display = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
-    //image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
-    cvCvtColor(hsvImage, image, CV_HSV2BGR);
-    cvIMG2RGB565(image, cis_rgb, 320, 240);
-    fb_display(cis_rgb, 435, 120);
-
-    cvReleaseImage(&image_display);
+    cvReleaseImage(&hsvImg);
+    cvReleaseImage(&image);
     cvReleaseImage(&resizeImg);
-    cvReleaseImage(&hsvImage);
+    cvReleaseImage(&maskImg);
     close_keyboard();
+    close(dev);
     return 0;
 }
