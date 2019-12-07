@@ -3,7 +3,7 @@ CC = arm-linux-gcc
 obj-m := dipsw.o
 KDIR := /home/parallels/working/linux-2.6.32-hanback
 PWD := $(shell pwd)
-TEST_TARGET = dip_test 
+TEST_TARGET = dip_test
 TEST_SRCS = $(TEST_TARGET).c
 default:$(TEST_TARGET)
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
