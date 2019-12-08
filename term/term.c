@@ -8,6 +8,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
@@ -17,6 +18,8 @@
 #include "cv.h"
 #include "highgui.h"
 
+#define FPGA_BASEADDRESS 0x88000000
+#define DIP_DATA_OFFSET 0x62
 #define RGB565(r, g, b) ((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3))
 #define FBDEV_FILE "/dev/fb0"
 #define CAMERA_DEVICE "/dev/camera"
@@ -124,8 +127,7 @@ int fb_display(unsigned short *rgb, int sx, int sy)
 
     for (coor_y = 0; coor_y < 240; coor_y++)
     {
-        ptr = (unsigned short *)pfbmap + (screen_width * sy + sx) +
-              (screen_width * coor_y);
+        ptr = (unsigned short *)pfbmap + (screen_width * sy + sx) + (screen_width * coor_y);
         for (coor_x = 0; coor_x < 320; coor_x++)
         {
             *ptr++ = rgb[coor_x + coor_y * 320];
@@ -172,19 +174,9 @@ void RGB2cvIMG(IplImage *img, unsigned short *rgb, int ex, int ey)
     {
         for (x = 0; x < ex; x++)
         {
-            (img->imageData[(y * img->widthStep) + x * 3]) = (rgb[y * ex + x] &
-                                                              0x1F)
-                                                             << 3; //b
-            (img->imageData[(y * img->widthStep) + x * 3 + 1]) = ((rgb[y * ex +
-                                                                       x] &
-                                                                   0x07E0) >>
-                                                                  5)
-                                                                 << 2; //g
-            (img->imageData[(y * img->widthStep) + x * 3 + 2]) = ((rgb[y * ex +
-                                                                       x] &
-                                                                   0xF800) >>
-                                                                  11)
-                                                                 << 3; //r
+            (img->imageData[(y * img->widthStep) + x * 3]) = (rgb[y * ex + x] & 0x1F) << 3;               //b
+            (img->imageData[(y * img->widthStep) + x * 3 + 1]) = ((rgb[y * ex + x] & 0x07E0) >> 5) << 2;  //g
+            (img->imageData[(y * img->widthStep) + x * 3 + 2]) = ((rgb[y * ex + x] & 0xF800) >> 11) << 3; //r
         }
     }
 }
@@ -198,6 +190,7 @@ int main(int argc, char **argv)
     int optlen = strlen("--cascade=");
     unsigned short ch = 0;
     unsigned short dipSwitchNew, dipSwitchOrig;
+    unsigned short *addr_fpga, *addr_dip_data;
     char fileName[30];
     CvCapture *capture = 0;
     IplImage *image = NULL;
@@ -228,8 +221,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2,
-                                   PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+    pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 
     if ((unsigned)pfbmap < 0)
     {
@@ -237,12 +229,23 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    // dip switch memory mapping
     if ((dev = open("/dev/dipsw", O_RDONLY)) < 0)
     {
         perror("DIPSW open fail\n");
         return -1;
     }
+    addr_fpga = (unsigned short *)mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, FPGA_BASEADDRESS);
+    addr_dip_data = addr_fpga + DIP_DATA_OFFSET / sizeof(unsigned short);
 
+    if (*addr_dip_data == (unsigned short)-1)
+    {
+        close(fd);
+        printf("mmap error \n");
+        exit(1);
+    }
+
+    // lcd make blue
     storage = cvCreateMemStorage(0);
     Fill_Background(0x0011);
 
@@ -257,21 +260,24 @@ int main(int argc, char **argv)
     printf("Input the file name\n");
     scanf("%s", fileName);
     /*while(count < 30 && ch != '\n')
-         {
-                 if(kbhit())
-                 {
-                         ch = readch();
-                         fileName[count] = ch;
-                         count++;
-                 }
-         }
-         fileName[count - 1] = '\0';*/
+	{
+		if(kbhit())
+		{ 
+			ch = readch();
+			fileName[count] = ch;
+			count++;
+		}
+	}
+	fileName[count - 1] = '\0';*/
 
+    // name input
     image = cvLoadImage(fileName, 1);
     if (image == NULL)
     {
         printf("shut down\n");
         close_keyboard();
+        munmap(addr_fpga, 4096);
+        close(fd);
         return 0;
     }
 
@@ -298,8 +304,7 @@ int main(int argc, char **argv)
             if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > S_LIMIT)
             {
                 if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > V_LIMIT)
-                    maskImg->imageData[(y * maskImg->widthStep) + x] =
-                        color_table[resizeImg->imageData[(y * resizeImg->widthStep) + x * 3]];
+                    maskImg->imageData[(y * maskImg->widthStep) + x] = color_table[resizeImg->imageData[(y * resizeImg->widthStep) + x * 3]];
                 else
                     maskImg->imageData[(y * maskImg->widthStep) + x] = 0;
             }
@@ -308,14 +313,14 @@ int main(int argc, char **argv)
         }
 
     // Main operation
-    read(dev, &dipSwitchOrig, 2);
+    dipSwitchOrig = ((*addr_dip_data & 0x00f0)>>4) | (*addr_dip_data & 0x000f)<< 4));
     ch = 0;
     image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
     while (ch != 'q')
     {
         if (kbhit())
             ch = readch();
-        read(dev, &dipSwitchNew, 2);
+        dipSwitchNew = ((*addr_dip_data & 0x00f0)>>4) | (*addr_dip_data & 0x000f)<< 4));
         if (dipSwitchOrig != dipSwitchNew)
         {
             dipSwitchOrig = dipSwitchNew;
@@ -324,17 +329,12 @@ int main(int argc, char **argv)
                 {
                     if (dipSwitchOrig & maskImg->imageData[y * maskImg->widthStep + x])
                     {
-                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] =
-                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
-                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] =
-                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
-                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] =
-                            resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
                     }
                     else
-                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] =
-                            hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] =
-                                hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = 0;
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] = hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] = hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = 0;
                 }
             cvCvtColor(hsvImg, image, CV_HSV2BGR);
             cvIMG2RGB565(image, cis_rgb, 320, 240);
@@ -348,6 +348,8 @@ int main(int argc, char **argv)
     cvReleaseImage(&resizeImg);
     cvReleaseImage(&maskImg);
     close_keyboard();
+    munmap(addr_fpga, 4096);
+    close(fd);
     close(dev);
     return 0;
 }
