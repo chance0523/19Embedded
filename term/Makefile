@@ -1,6 +1,6 @@
 CC = arm-linux-gcc
-APP = fp_test
-CFLAGS = -DNO_DEBUG -I/home/jongseo/working/OpenCV_1_1_0_arm/include/opencv/ -L/home/jongseo/working/OpenCV_1_1_0_arm/lib/ -lcxcore -lcv -lhighgui -lcvaux -lml
+APP = term
+CFLAGS = -DNO_DEBUG -I/home/chance/19em/working/opencv_test/OpenCV_1_1_0_arm/include/opencv/ -L/home/chance/19em/working/opencv_test/OpenCV_1_1_0_arm/lib/ -lcxcore -lcv -lhighgui -lcvaux -lml
 
 OBJS = $(APP).o
 
