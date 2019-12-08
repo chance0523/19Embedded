@@ -313,6 +313,7 @@ int main(int argc, char **argv)
         }
 
     // Main operation
+
     dipSwitchOrig = (((*addr_dip_data & 0x00f0) >> 4) | (*addr_dip_data & 0x000f) << 4);
     ch = 0;
     image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
