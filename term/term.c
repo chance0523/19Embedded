@@ -314,6 +314,7 @@ int main(int argc, char **argv)
 			count++;
 		}
 	}
+<<<<<<< HEAD
 	printf("\n");
 	fileName[count] = '\0';*/
 
@@ -399,4 +400,98 @@ int main(int argc, char **argv)
 	close(fd); 
 	close(dev);
 	return 0;
+=======
+	fileName[count - 1] = '\0';*/
+
+    // name input
+    image = cvLoadImage(fileName, 1);
+    if (image == NULL)
+    {
+        printf("shut down\n");
+        close_keyboard();
+        munmap(addr_fpga, 4096);
+        close(fd);
+        return 0;
+    }
+
+    // Image matrixes define
+    resizeImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    hsvImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    maskImg = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 1);
+
+    // Image resizing
+    cvResize(image, resizeImg, CV_INTER_LINEAR);
+    cvReleaseImage(&image);
+
+    // Image display
+    cvIMG2RGB565(resizeImg, cis_rgb, 320, 240);
+    fb_display(cis_rgb, 40, 120);
+
+    // Image change RGB to HSV
+    cvCvtColor(resizeImg, resizeImg, CV_BGR2HSV);
+
+    // Make a mask Image (color table)
+    for (y = 0; y < 240; y++)
+        for (x = 0; x < 320; x++)
+        {
+            if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1] > S_LIMIT)
+            {
+                if (resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2] > V_LIMIT)
+                    maskImg->imageData[(y * maskImg->widthStep) + x] = color_table[resizeImg->imageData[(y * resizeImg->widthStep) + x * 3]];
+                else
+                    maskImg->imageData[(y * maskImg->widthStep) + x] = 0;
+            }
+            else
+                maskImg->imageData[(y * maskImg->widthStep) + x] = 0;
+        }
+
+    // Main operation
+<<<<<<< HEAD
+    dipSwitchOrig = (((*addr_dip_data & 0x00f0)>>4) | (*addr_dip_data & 0x000f)<< 4);
+=======
+    dipSwitchOrig = (((*addr_dip_data & 0x00f0) >> 4) | (*addr_dip_data & 0x000f) << 4);
+>>>>>>> 441810bd256e0dede1730cddb1ba0e5404f12c67
+    ch = 0;
+    image = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 3);
+    while (ch != 'q')
+    {
+        if (kbhit())
+            ch = readch();
+<<<<<<< HEAD
+        dipSwitchNew = (((*addr_dip_data & 0x00f0)>>4) | (*addr_dip_data & 0x000f)<< 4);
+=======
+        dipSwitchNew = (((*addr_dip_data & 0x00f0) >> 4) | (*addr_dip_data & 0x000f) << 4);
+>>>>>>> 441810bd256e0dede1730cddb1ba0e5404f12c67
+        if (dipSwitchOrig != dipSwitchNew)
+        {
+            dipSwitchOrig = dipSwitchNew;
+            for (y = 0; y < 240; y++)
+                for (x = 0; x < 320; x++)
+                {
+                    if (dipSwitchOrig & maskImg->imageData[y * maskImg->widthStep + x])
+                    {
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 1];
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = resizeImg->imageData[(y * resizeImg->widthStep) + x * 3 + 2];
+                    }
+                    else
+                        hsvImg->imageData[y * hsvImg->widthStep + x * 3] = hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 1] = hsvImg->imageData[y * hsvImg->widthStep + x * 3 + 2] = 0;
+                }
+            cvCvtColor(hsvImg, image, CV_HSV2BGR);
+            cvIMG2RGB565(image, cis_rgb, 320, 240);
+            fb_display(cis_rgb, 435, 120);
+            printf("%02X\n", dipSwitchOrig);
+        }
+    }
+
+    cvReleaseImage(&hsvImg);
+    cvReleaseImage(&image);
+    cvReleaseImage(&resizeImg);
+    cvReleaseImage(&maskImg);
+    close_keyboard();
+    munmap(addr_fpga, 4096);
+    close(fd);
+    close(dev);
+    return 0;
+>>>>>>> 8a40f6ddd91c7883e5eebd0005fc0b987f6f3683
 }
