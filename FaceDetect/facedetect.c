@@ -256,7 +256,8 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+	pfbmap = (unsigned char *)mmap(0, fbvar.xres * fbvar.yres * 2,
+								   PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 
 	if ((unsigned)pfbmap < 0)
 	{
